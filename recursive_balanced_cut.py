@@ -21,31 +21,12 @@ def random_unit_vectors(k, n):
     return unit_vectors
 
 
-def project_embedding(vectors, heat_kernel):
-    # Placeholder for projection step
-    # return np.dot(vectors, heat_kernel)
-    pass
-
-
-def find_cut(graph, vectors):
-    # Placeholder for FindCut subroutine
-    # This would be a complex function to implement, involving SDP and sweep cuts
-    # return set(), False  # Return a cut and a boolean indicating if it's balanced
-    pass
-
-
-def expv(vectors):
-    # Placeholder for ExpV subroutine
-    # return vectors
-    pass
-
-
 # Code below defines some of the preliminary quantities and special matrices
 # section 5.1, basic preliminaries:
 ## instance graph and edge volume
 
 
-def get_volume(graph: nx.graph, cut: np.ndarray) -> int:
+def get_volume(graph: nx.Graph, cut: np.ndarray) -> int:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
@@ -54,14 +35,15 @@ def get_volume(graph: nx.graph, cut: np.ndarray) -> int:
         The volume of the cut
     '''
 
-    degree_vector = nx.degree_matrix(graph, weight='weight')
+    degree_vector = nx.degree(graph, weight='weight')
+    
     # for i in cut:
     #     volume += graph.degree(i, weight='weight')
     volume = np.dot(degree_vector, cut)
     return volume
 
 
-def check_balanced(graph: nx.graph, cut: np.ndarray, b: float) -> bool:
+def check_balanced(graph: nx.Graph, cut: np.ndarray, b: float) -> bool:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
@@ -129,7 +111,7 @@ def compute_laplacian_complete_graph(graph) -> np.ndarray:
     '''
 
     complete_graph = complete_graph(graph)
-    D = nx.degree_matrix(complete_graph, weight='weight')
+    D = nx.degree(complete_graph, weight='weight')
     m = complete_graph.number_of_edges()
     ones = np.ones(n)
     L = D - 1 / (2 * m) * D @ ones @ ones.T @ D
@@ -257,7 +239,7 @@ def compute_total_deviation_graph(graph, tau, beta) -> float:
     Output:
         psi(P, G) = L(K_V) \bullet D^-1 P_2tau(beta)
     '''
-    degree_vector = nx.degree_matrix(graph, weight='weight')
+    degree_vector = nx.degree(graph, weight='weight')
     D_inv = np.diag(1 / degree_vector)
     L = nx.laplacian_matrix(graph, weight="weight")
     P_2tau_beta = compute_transition_matrix(graph, L, beta, degree_vector,
@@ -386,7 +368,7 @@ def balanced_separator(graph, b, gamma, epsilon=1, alpha=1) -> set | None:
     for t in range(1, T + 1):
         # compute heat kernel
         L = nx.laplacian_matrix(graph, weight="weight")
-        degree_vector = nx.degree_matrix(graph, weight='weight')
+        degree_vector = nx.degree(graph, weight='weight')
         D_sqrt_inv = np.diag(1 / np.sqrt(degree_vector))
         P_t = compute_transition_matrix(graph, L, beta, degree_vector, t)
 
