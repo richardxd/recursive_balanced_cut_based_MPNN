@@ -62,8 +62,8 @@ def get_volume_prefix(G: nx.Graph, indices: np.ndarray) -> np.ndarray:
 
 def sweep_cut(G: nx.Graph,
               x: np.ndarray,
-              lower_vol: np.float('-inf'),
-              upper_vol: float = np.float('inf'),
+              lower_vol: float = np.inf,
+              upper_vol: float = np.inf,
               reversed_cut: bool = True,
               partial: float | None = None) -> (float, float, np.ndarray):
     """Sweep Cut
@@ -120,14 +120,16 @@ def sweep_cut(G: nx.Graph,
     # the volume of S_i is vol_sum[i] if not reversed
     # otherwise, compute the volume of S_i by vol_sum[-1] - vol_sum[i]
     vol = vol_sum[-1] - vol_sum if reversed_cut else vol_sum
-    conductance_arr[(vol < lower_vol) | (vol > upper_vol)] = np.inf
+    # print(vol.shape)
+    # print(conductance_arr.shape)
+    conductance_arr[(vol < lower_vol)[:-1] | (vol > upper_vol)[:-1]] = np.inf
 
     if partial:
         # run sweep cut on G with embedding r. Let z be the smallest index such that vol(S_z) >= b/4 * 2m
         # output the most balanced sweep cut among {S1, ..., Sz-1} such that the conductance is at most 40 \sqrt{gamma}
         # if no such cut exists, raise an error
 
-        # find the smallest index such that vol(S_z) >= b/4 * 2m
+        # find the smallest inde such that vol(S_z) >= b/4 * 2m
         # vol_sum[-1] is the total volume of the cut
         z = np.searchsorted(vol_sum, partial)
         if z == n:

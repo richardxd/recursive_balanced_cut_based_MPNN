@@ -1,75 +1,107 @@
 import matplotlib as mpl
-import matplotlib.pyplot as plt
-from sweep_cut import *
-# Path: test.py
+import matplotlib.pyplot as pl
+import unittest
+import numpy as np
+import networkx as nx
+import sweep_cut
 
-# Test case 1
-# Create a small graph
-G = nx.Graph()
-G.add_edge(0, 1, weight=2)
-G.add_edge(0, 2, weight=3)
-G.add_edge(1, 2, weight=4)
+class TestReverseAndPrefixSum(unittest.TestCase):
+    def test_get_reverse_and_prefix_sum(self):
+        G = nx.Graph()
+        G.add_edge(0, 1, weight=2)
+        G.add_edge(0, 2, weight=3)
+        G.add_edge(1, 2, weight=4)
+        x = np.array([0.5, 0.2, 0.8])
+        indices = np.argsort(x)
+        expected_prefix_sum = np.array([0, 2, 7], dtype=np.float64)
+        expected_reversed_sum = np.array([6, 3, 0], dtype=np.float64)
+        prefix_sum, reversed_sum = sweep_cut.get_reverse_and_prefix_sum(G, indices)
+        np.testing.assert_array_equal(prefix_sum, expected_prefix_sum)
+        np.testing.assert_array_equal(reversed_sum, expected_reversed_sum)
 
-# Define the node embeddings
-x = np.array([0.5, 0.2, 0.8])
+class TestCutWeights(unittest.TestCase):
+    def test_get_cut_weights(self):
+        G = nx.Graph()
+        G.add_edge(0, 1, weight=2)
+        G.add_edge(0, 2, weight=3)
+        G.add_edge(1, 2, weight=4)
+        x = np.array([0.5, 0.2, 0.8])
+        indices = np.argsort(x)
+        expected_cut_weights = np.array([6, 7, 0], dtype=np.float64)
+        cut_weights = sweep_cut.get_cut_weights(G, indices)
+        np.testing.assert_array_equal(cut_weights, expected_cut_weights)
 
-# Define the sorted indices
-indices = np.argsort(x)
+class TestVolumePrefix(unittest.TestCase):
+    def test_get_volume_prefix(self):
+        G = nx.Graph()
+        G.add_edge(0, 1, weight=2)
+        G.add_edge(0, 2, weight=3)
+        G.add_edge(1, 2, weight=4)
+        x = np.array([0.5, 0.2, 0.8])
+        indices = np.argsort(x)
+        expected_vol_sum = np.array([6, 11, 18], dtype=np.float64)
+        vol_sum = sweep_cut.get_volume_prefix(G, indices)
+        np.testing.assert_array_equal(vol_sum, expected_vol_sum)
 
-# Expected results
-expected_prefix_sum = np.array([0, 2, 7], dtype=np.float64)
-expected_reversed_sum = np.array([6, 3, 0], dtype=np.float64)
-expected_cut_weights = np.array([6, 7, 0], dtype=np.float64)
+class TestSweepCut(unittest.TestCase):
+    def test_sweep_cut(self):
+        n = 100
+        P = nx.path_graph(n)
+        nx.set_edge_attributes(P, 1, 'weight')
+        x = np.linspace(0, 1, n)
+        thr, cond, cut = sweep_cut.sweep_cut(P, x)
+        self.assertGreaterEqual(thr, 0)
+        self.assertGreaterEqual(cond, 0)
+        self.assertIsInstance(cut, np.ndarray)
 
-# Test get_reverse_and_prefix_sum function
-prefix_sum, reversed_sum = get_reverse_and_prefix_sum(G, x, indices)
+if __name__ == '__main__':
+    unittest.main()
 
-assert np.array_equal(prefix_sum, expected_prefix_sum)
-assert np.array_equal(reversed_sum, expected_reversed_sum)
+if __name__ == '__main__':
+    unittest.main()
+# # Path: test.py
 
-# Test get_cut_weights function
-cut_weights = get_cut_weights(G, x, indices)
-assert np.array_equal(cut_weights, expected_cut_weights)
 
-print("Test cases passed!")
 
-# Create a small graph
-G = nx.Graph()
-G.add_edge(0, 1, weight=2)
-G.add_edge(0, 2, weight=3)
-G.add_edge(1, 2, weight=4)
 
-# Define the node embeddings
-x = np.array([0.5, 0.2, 0.8])
+#
+# # Create a small graph
+# G = nx.Graph()
+# G.add_edge(0, 1, weight=2)
+# G.add_edge(0, 2, weight=3)
+# G.add_edge(1, 2, weight=4)
 
-# Define the sorted indices
-indices = np.argsort(x)
+# # Define the node embeddings
+# x = np.array([0.5, 0.2, 0.8])
 
-# Compute the volume of the cut
-vol_sum = get_volume_prefix(G, indices)
+# # Define the sorted indices
+# indices = np.argsort(x)
 
-# Expected results
-expected_vol_sum = np.array([6, 11, 18], dtype=np.float64)
+# # Compute the volume of the cut
+# vol_sum = get_volume_prefix(G, indices)
 
-# Check if the computed volume of the cut matches the expected results
-assert np.array_equal(vol_sum, expected_vol_sum)
+# # Expected results
+# expected_vol_sum = np.array([6, 11, 18], dtype=np.float64)
 
-print("Test case passed!")
+# # Check if the computed volume of the cut matches the expected results
+# assert np.array_equal(vol_sum, expected_vol_sum)
 
-# TODO: assemble the test function into on
+# print("Test case passed!")
 
-n = 100
-P = nx.path_graph(n)
-nx.set_edge_attributes(P, 1, 'weight')
-x = np.linspace(0, 1, n)
-thr, cond, cut = sweep_cut(P, x)
+# # TODO: assemble the test function into on
 
-print(
-    f'On the path with {n} nodes the best conductance threshold is thr = {thr:.6f} and yields conductance {cond:.6f}.'
-)
-pos = nx.spectral_layout(P)
-nx.draw(P, pos=pos, node_color=colors[cut], node_size=50)
+# n = 100
+# P = nx.path_graph(n)
+# nx.set_edge_attributes(P, 1, 'weight')
+# x = np.linspace(0, 1, n)
+# thr, cond, cut = sweep_cut(P, x)
 
-if __name__ == "__main__":
-    graph = nx.Graph()
-    graph.add_nodes_from([1, 2, 3, 4, 5, 6, 7, 8])
+# print(
+#     f'On the path with {n} nodes the best conductance threshold is thr = {thr:.6f} and yields conductance {cond:.6f}.'
+# )
+# pos = nx.spectral_layout(P)
+# nx.draw(P, pos=pos, node_color=colors[cut], node_size=50)
+
+# if __name__ == "__main__":
+#     graph = nx.Graph()
+#     graph.add_nodes_from([1, 2, 3, 4, 5, 6, 7, 8])
