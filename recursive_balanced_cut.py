@@ -31,7 +31,7 @@ def update_beta(beta, cut, gamma, T) -> np.ndarray:
 
 
 def get_degree_vector(graph: nx.Graph) -> np.ndarray:
-    return np.array(graph.degree(weight='weight'))[:, 1]
+    return np.array(graph.degree(weight='weight'), dtype=np.float64)[:, 1]
 
 
 ## Fact 5.1
@@ -97,8 +97,8 @@ class BalSep:
         self.volume_graph = self.get_volume([1] * len(graph))
         self.n = self.graph_nodes()
         self.m = self.graph_edges()
-        self.laplacian_matrix = nx.laplacian_matrix(graph,
-                                                    weight="weight").toarray()
+        self.laplacian_matrix = np.array(nx.laplacian_matrix(graph,
+                                                    weight="weight").toarray(), dtype=np.float64)
 
     # Code below defines some of the preliminary quantities and special matrices
     # section 5.1, basic preliminaries:
@@ -184,7 +184,7 @@ class BalSep:
         '''
         star_graph = nx.Graph()
         # efficiently compute the sum of degree = 2m = 2 * {n choose 2} = 2 * n * (n - 1)/2
-        for j in self.n:
+        for j in range(self.n):
             if j != v:
                 star_graph.add_edge(v,
                                     j,
@@ -227,8 +227,9 @@ class BalSep:
         D_inv = np.diag(1 / self.degree_vector)
         Q = self.laplacian_matrix
         laplacian_star_graphs = [
-            nx.laplacian_matrix(self.generate_star_graph(i)).toarray()
-            for i in range(self.graph.nodes())
+            nx.laplacian_matrix(self.generate_star_graph(i),
+                                weight="weight").toarray()
+            for i in range(self.n)
         ]
 
         for i in range(self.n):
@@ -330,8 +331,8 @@ class BalSep:
         '''
 
         T = 12 * int(np.ceil(np.log(self.n)))
-        S = set()
-        beta = np.zeros(self.n)  # Initialize beta
+        S = np.zeros(self.n)
+        beta = np.zeros(self.n, dtype=np.float64)  # Initialize beta
         tau = np.log(self.n / 12 * gamma)
 
         # Run for T iterations
@@ -379,7 +380,8 @@ class BalSep:
             if is_balanced:
                 return cut  # Return the balanced cut
             else:
-                S.update(cut)  # Update set S with the new cut
+                # S.update(cut)  # Update set S with the new cut
+                S = np.logical_or(S, cut)
 
             # Update beta for the next iteration
             beta = update_beta(beta, cut, t, T)
