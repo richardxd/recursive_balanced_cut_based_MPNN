@@ -1,19 +1,11 @@
 import numpy as np
 import networkx as nx
-from scipy.sparse.csgraph import laplacian
 import scipy
 
-from sweep_cut import sweep_cut, get_volume_prefix
-
-from typing import Tuple, Dict, Hashable
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-
-colors = np.array(['tab:blue', 'orange'])
+from sweep_cut import sweep_cut
 
 
-def random_unit_vectors(k, n):
+def random_unit_vectors(k: int, n: int) -> np.ndarray:
     # Generate k random vectors in R^n
     vectors = np.random.randn(k, n)
     # Normalize each vector to have unit length
@@ -30,13 +22,13 @@ def get_volume(graph: nx.Graph, cut: np.ndarray) -> int:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
-        cut: a np.ndarray of length n, where cut[i] = 1 if i is in the cut, 0 otherwise 
+        cut: a np.ndarray of length n, where cut[i] = 1 if i is in the cut, 0 otherwise
     Output:
         The volume of the cut
     '''
 
     degree_vector = nx.degree(graph, weight='weight')
-    
+
     # for i in cut:
     #     volume += graph.degree(i, weight='weight')
     volume = np.dot(degree_vector, cut)
@@ -47,7 +39,7 @@ def check_balanced(graph: nx.Graph, cut: np.ndarray, b: float) -> bool:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
-        cut: a np.ndarray of length n, where cut[i] = 1 if i is in the cut, 0 otherwise 
+        cut: a np.ndarray of length n, where cut[i] = 1 if i is in the cut, 0 otherwise
         b: a constant balance value b \in (0, 1/2]
     Output:
         True if the cut is balanced, False otherwise
@@ -58,13 +50,13 @@ def check_balanced(graph: nx.Graph, cut: np.ndarray, b: float) -> bool:
     cut_complement = 1 - cut
     volume_complement = get_volume(graph, cut_complement)
     volume_v = graph.get_volume(graph, [1] * len(graph))
-    if min(volume, cut_complement) >= b * volume_v:
+    if min(volume, volume_complement) >= b * volume_v:
         return True
     return False
 
 
 ## speical graph
-def complete_graph(graph) -> nx.Graph:
+def generate_complete_graph(graph) -> nx.Graph:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
@@ -84,7 +76,7 @@ def complete_graph(graph) -> nx.Graph:
     return complete_graph
 
 
-def star_graph(graph, v) -> nx.Graph:
+def generate_star_graph(graph, v) -> nx.Graph:
     '''
     Input:
         graph: an unweighted instance graph G = (V,E)
@@ -93,12 +85,19 @@ def star_graph(graph, v) -> nx.Graph:
         S_i: the star grpah rooted at i, with edge weight of d_id_j/2m between i and j for all j in V
     '''
     star_graph = nx.Graph()
+    # efficiently compute the sum of degree = 2m = 2 * {n choose 2} = 2 * n * (n - 1)/2
+    n = graph.number_of_nodes()
+    m = graph.number_of_edges()
     for j in graph.nodes():
         if j != v:
             d_i = graph.degree(v, weight='weight')
             d_j = graph.degree(j, weight='weight')
             star_graph.add_edge(v, j, weight=d_i * d_j / (2 * m))
     return star_graph
+
+
+def get_degree_vector(graph) -> np.ndarray:
+    return np.array(graph.degree(weight='weight'))[:, 1]
 
 
 ## Fact 5.1
@@ -110,8 +109,9 @@ def compute_laplacian_complete_graph(graph) -> np.ndarray:
         laplacian of the special complete graph obtained via the function complete_graph()
     '''
 
-    complete_graph = complete_graph(graph)
-    D = nx.degree(complete_graph, weight='weight')
+    complete_graph = generate_complete_graph(graph)
+    n = complete_graph.number_of_nodes()
+    D = np.diag(get_degree_vector(complete_graph))
     m = complete_graph.number_of_edges()
     ones = np.ones(n)
     L = D - 1 / (2 * m) * D @ ones @ ones.T @ D
@@ -128,9 +128,18 @@ def compute_average_node_embedding(graph, embeddings) -> np.ndarray:
         v_avg := sum_{i in V} d_i/(2m) * v_i
     '''
     v_avg = np.zeros(len(embeddings[0]))
+    v_avg_test = np.zeros(len(embeddings[0]))
     m = graph.number_of_edges()
+
+    for (i, deg) in enumerate(graph.degree(weight='weight')):
+        v_avg += embeddings[i] * deg / (2 * m)
+
     for i in range(len(embeddings)):
-        v_avg += embeddings[i] * graph.degree(i, weight='weight') / (2 * m)
+        v_avg_test += embeddings[i] * graph.degree(i,
+                                                   weight='weight') / (2 * m)
+
+    assert np.allclose(v_avg, v_avg_test)
+
     return v_avg
 
 
@@ -148,7 +157,7 @@ def compute_transition_rate_matrix(graph, L, beta,
     Input:
         L: the Laplacian matrix of the instance graph
         beta: a vector of length n
-        degree_vector one dimension vector of the diagonal of the degree matrix of the instance graph 
+        degree_vector one dimension vector of the diagonal of the degree matrix of the instance graph
     Output:
         Q(beta) = -( L + sum_i in V beta_i L(S_i)) D^-1
     '''
@@ -156,12 +165,13 @@ def compute_transition_rate_matrix(graph, L, beta,
     D_inv = np.diag(1 / degree_vector)
     Q = L
     laplacian_star_graphs = [
-        star_graph(graph, i).laplacian_matrix for i in range(graph.nodes())
+        nx.laplacian_matrix(generate_star_graph(graph, i))
+        for i in range(graph.nodes())
     ]
 
     for i in range(n):
         Q += beta[i] * laplacian_star_graphs[i]
-    Q = -Q @ np.linalg.inv(D)
+    Q = -Q @ D_inv
     return Q
 
 
@@ -171,10 +181,10 @@ def compute_transition_matrix(graph, L, beta, degree_vector,
     Input:
         L: the Laplacian matrix of the instance graph
         beta: a vector of length n
-        degree_vector one dimension vector of the diagonal of the degree matrix of the instance graph 
+        degree_vector one dimension vector of the diagonal of the degree matrix of the instance graph
         tau: time parameter
     Output:
-        P_tau (beta) = exp(tau Q(beta)) 
+        P_tau (beta) = exp(tau Q(beta))
     '''
     Q = compute_transition_rate_matrix(graph, L, beta, degree_vector)
     return scipy.linalg.expm(tau * Q)
@@ -221,7 +231,7 @@ def compute_total_deviation(graph, P, S) -> float:
         P: a probability transition matrix
         S: a subset of V
     Output:
-        psi(P, S) := sum_{i in S} psi(P, i) 
+        psi(P, S) := sum_{i in S} psi(P, i)
     '''
     pass
     # sum_ = 0
@@ -284,6 +294,8 @@ def projection_rounding(graph: nx.Graph, embeddings: np.ndarray,
     h = len(embeddings[0])
     T = int(np.ceil(np.log(n)))
     c = b / 100  # constant c = Omega(b) <= b/100
+    conductance_lst = []
+    cut_lst = []
     for t in range(1, T + 1):
         # pick a unit vector u uniformly at random from S^h-1
         u = random_unit_vectors(k=h, n=1)
@@ -291,8 +303,15 @@ def projection_rounding(graph: nx.Graph, embeddings: np.ndarray,
         # define x_i = sqrt{h} u^T v_i
         x = np.sqrt(h) * np.dot(u.T, embeddings)
 
-        _, _, cut = sweep_cut(graph, x, lower=c * 2 * m, upper=(1 - c) * 2 * m)
-    return cut
+        _, conductance, cut = sweep_cut(graph,
+                                        x,
+                                        lower_vol=c * 2 * m,
+                                        upper_vol=(1 - c) * 2 * m)
+        conductance_lst.append(conductance)
+        cut_lst.append(cut)
+    # return the cut with the smallest conductance
+    idx = np.argmin(conductance_lst)
+    return cut_lst[idx]
 
 
 ## FindCut
@@ -308,6 +327,7 @@ def find_cut(graph: nx.Graph, b: float, alpha: float, embeddings: np.ndarray,
         cut: a subset of V
         is_balanced: True if the cut is balanced, False otherwise
     '''
+    m = graph.number_of_edges()
     v_avg = compute_average_node_embedding(graph, embeddings)
     r = np.linalg.norm(embeddings - v_avg, axis=1)
 
@@ -320,6 +340,7 @@ def find_cut(graph: nx.Graph, b: float, alpha: float, embeddings: np.ndarray,
 
     # the set R := {i in V : r_i^2 <= 32 * (1-b)/b * psi / 2m}
     graph_R = graph.copy()
+
     for i in graph.nodes():
         if r[i]**2 > 32 * (1 - b) / b * psi / (2 * m):
             graph_R.remove_node(i)
@@ -396,7 +417,7 @@ def balanced_separator(graph, b, gamma, epsilon=1, alpha=1) -> set | None:
             return None
 
         # Run FindCut subroutine
-        cut = find_cut(graph, b, gamma, vectors)
+        cut = find_cut(graph, b, alpha, vectors, gamma)
         if not cut:
             return None
 
