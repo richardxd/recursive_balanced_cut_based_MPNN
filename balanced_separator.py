@@ -94,7 +94,7 @@ class BalSep:
         self.degree_vector = get_degree_vector(self.graph)
         self.degree_matrix = np.diag(self.degree_vector)
 
-        self.volume_graph = self.get_volume([1] * len(graph))
+        self.volume_graph = sum(self.degree_vector) 
         self.n = self.graph_nodes()
         self.m = self.graph_edges()
         self.laplacian_matrix = np.array(nx.laplacian_matrix(graph,

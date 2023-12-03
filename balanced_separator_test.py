@@ -10,7 +10,7 @@ class TestBalSep(unittest.TestCase):
         self.bal_sep = BalSep(self.graph)
 
     def test_balanced_separator(self):
-        b = 0.5
+        b = 0.3
         gamma = 1 
         epsilon = 1
         alpha = 1
