@@ -45,10 +45,10 @@ def compute_laplacian_complete_graph(graph: nx.Graph) -> np.ndarray:
 
     n = graph.number_of_nodes()
     m = graph.number_of_edges()
-    ones = np.ones(n)
+    ones = np.ones((n, 1))
 
     D = np.diag(get_degree_vector(graph))
-    L = D - 1 / (2 * m) * D @ ones @ ones.T @ D
+    L = D - 1 / (2 * m) * D @ ones @ ones.T @ D 
     return L
 
 
@@ -353,8 +353,7 @@ class BalSep:
             #   (v_i^t)_j = \sqrt{n/k} u_j^T D^-1/2 P^t e_i
             vectors = np.zeros((self.n, k))
 
-            vectors = np.sqrt(self.n / k) * np.dot(unit_vectors.T,
-                                                   D_sqrt_inv) @ P_t
+            vectors = np.sqrt(self.n / k) * unit_vectors @ D_sqrt_inv @ P_t
             # TODO: replace with EXPV
             # vectors = EXPV(P_t, unit_vectors)
 
