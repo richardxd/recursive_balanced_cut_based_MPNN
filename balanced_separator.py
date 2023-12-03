@@ -366,7 +366,7 @@ class BalSep:
             L_K_V = compute_laplacian_complete_graph(self.graph)
             # compute  L_K_V \bullet D^-1 X_t
             estimate = np.trace(L_K_V @ X_t)
-            if estimate > (1 + epsilon) / self.n:
+            if estimate <= (1 + epsilon) / self.n:
                 return None
 
             # Run FindCut subroutine
