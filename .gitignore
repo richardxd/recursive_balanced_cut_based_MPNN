@@ -1,2 +1,4 @@
 *.ipynb
 /images
+/.vscode
+/__pycache__
