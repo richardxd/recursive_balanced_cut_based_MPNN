@@ -10,10 +10,10 @@ class TestBalSep(unittest.TestCase):
         self.bal_sep = BalSep(self.graph)
 
     def test_balanced_separator(self):
-        b = 0.3
+        b = 0.2
         gamma = 1 
         epsilon = 1
-        alpha = 1
+        alpha = 3
         result = self.bal_sep.balanced_separator(b, gamma, epsilon, alpha)
         print(result)
         # Use assert statements to verify the result

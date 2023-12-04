@@ -3,7 +3,7 @@ import networkx as nx
 import scipy
 from functools import lru_cache
 
-from sweep_cut import sweep_cut
+from sweep_cut import SweepCut
 
 
 def random_unit_vectors(k: int, n: int) -> np.ndarray:
@@ -48,12 +48,13 @@ def compute_laplacian_complete_graph(graph: nx.Graph) -> np.ndarray:
     ones = np.ones((n, 1))
 
     D = np.diag(get_degree_vector(graph))
-    L = D - 1 / (2 * m) * D @ ones @ ones.T @ D 
+    L = D - 1 / (2 * m) * D @ ones @ ones.T @ D
     return L
 
 
 # Section 5.7 Projection rounding
-def projection_rounding(graph, embeddings: np.ndarray, b: float) -> set:
+def projection_rounding(graph: nx.Graph, embeddings: np.ndarray,
+                        b: float) -> set:
     '''
     Input:
         embeddings: a list of n-dimensional vectors, where each vector is an embedding of the node v_i
@@ -70,15 +71,14 @@ def projection_rounding(graph, embeddings: np.ndarray, b: float) -> set:
     cut_lst = []
     for t in range(1, T + 1):
         # pick a unit vector u uniformly at random from S^h-1
-        u = random_unit_vectors(k=h, n=1)
+        u = random_unit_vectors(k=1, n=h)
 
         # define x_i = sqrt{h} u^T v_i
-        x = np.sqrt(h) * np.dot(u.T, embeddings)
+        x = np.sqrt(h) * (u @ embeddings.T).flatten()
 
-        _, conductance, cut = sweep_cut(graph,
-                                        x,
-                                        lower_vol=c * 2 * m,
-                                        upper_vol=(1 - c) * 2 * m)
+        sweep_cut = SweepCut(graph, x)
+        _, conductance, cut = sweep_cut.sweep_cut(lower_vol=c * 2 * m,
+                                                  upper_vol=(1 - c) * 2 * m)
         conductance_lst.append(conductance)
         cut_lst.append(cut)
     # return the cut with the smallest conductance
@@ -94,11 +94,12 @@ class BalSep:
         self.degree_vector = get_degree_vector(self.graph)
         self.degree_matrix = np.diag(self.degree_vector)
 
-        self.volume_graph = sum(self.degree_vector) 
+        self.volume_graph = sum(self.degree_vector)
         self.n = self.graph_nodes()
         self.m = self.graph_edges()
-        self.laplacian_matrix = np.array(nx.laplacian_matrix(graph,
-                                                    weight="weight").toarray(), dtype=np.float64)
+        self.laplacian_matrix = np.array(nx.laplacian_matrix(
+            graph, weight="weight").toarray(),
+                                         dtype=np.float64)
 
     # Code below defines some of the preliminary quantities and special matrices
     # section 5.1, basic preliminaries:
@@ -146,8 +147,7 @@ class BalSep:
 
         volume_cut = self.get_volume(cut)
         # find the complement of the cut
-        cut_complement = 1 - cut
-        volume_complement = self.get_volume(cut_complement)
+        volume_complement = self.volume_graph - volume_cut 
         if min(volume_cut, volume_complement) >= b * self.volume_graph:
             return True
         return False
@@ -310,16 +310,15 @@ class BalSep:
         # output the most balanced sweep cut among {S1, ..., Sz-1} such that the conductance is at most 40 \sqrt{gamma}
         # if no such cut exists, raise an error
 
-        _, conductance, cut = sweep_cut(self.graph,
-                                        r,
-                                        partial=b / 4 * 2 * self.m)
+        sweep_cut = SweepCut(self.graph, r)
+        _, conductance, cut = sweep_cut.sweep_cut(partial=b / 4 * 2 * self.m)
         if conductance <= 40 * np.sqrt(gamma):
             return cut
         else:
             raise ValueError("No balanced cut exists")
 
     # Final algorithm
-    def balanced_separator(self, b, gamma, epsilon=1, alpha=1) -> set | None:
+    def balanced_separator(self, b, gamma, epsilon=1, alpha=5) -> set | None:
         '''
         input:
             graph: an unweighted instance graph G = (V,E)
@@ -371,8 +370,8 @@ class BalSep:
 
             # Run FindCut subroutine
             cut = self.find_cut(b, alpha, vectors.T, gamma)
-            if not cut:
-                return None
+            if cut is None:
+                return None 
 
             # Check if the cut is balanced
             is_balanced = self.check_balanced(cut, b)
