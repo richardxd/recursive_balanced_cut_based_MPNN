@@ -2,3 +2,6 @@
 /images
 /.vscode
 /__pycache__
+environment.txt
+test_gpu.py
+.bash_history
