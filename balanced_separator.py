@@ -276,7 +276,7 @@ class BalSep:
             graph: an unweighted instance graph G = (V,E)
             b: a constant balance value b \in (0, 1/2]
             alpha: a constant alpha > 0
-            embeddings: a list of n-dimensional vectors, where each vector is an embedding of the node v_i
+            embeddings: a list of n-dimensional vectors, where each column vector is an embedding of the node v_i
         Output:
             cut: a subset of V
             is_balanced: True if the cut is balanced, False otherwise
@@ -285,7 +285,7 @@ class BalSep:
         r = np.linalg.norm(embeddings - v_avg, axis=1)
 
         # compute the gram matrix X of embeddings
-        X = embeddings.T @ embeddings
+        X = embeddings @ embeddings.T
 
         L_K_V = compute_laplacian_complete_graph(self.graph)
         psi = np.trace(L_K_V @ X)
@@ -293,7 +293,7 @@ class BalSep:
         # the set R := {i in V : r_i^2 <= 32 * (1-b)/b * psi / 2m}
         graph_R = self.graph.copy()
 
-        for i in self.n:
+        for i in range(self.n):
             if r[i]**2 > 32 * (1 - b) / b * psi / (2 * self.m):
                 graph_R.remove_node(i)
 
@@ -370,7 +370,7 @@ class BalSep:
                 return None
 
             # Run FindCut subroutine
-            cut = self.find_cut(b, alpha, vectors, gamma)
+            cut = self.find_cut(b, alpha, vectors.T, gamma)
             if not cut:
                 return None
 
