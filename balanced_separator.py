@@ -101,6 +101,7 @@ class BalSep:
             graph, weight="weight").toarray(),
                                          dtype=np.float64)
 
+
     # Code below defines some of the preliminary quantities and special matrices
     # section 5.1, basic preliminaries:
     ## instance graph and edge volume
@@ -147,7 +148,7 @@ class BalSep:
 
         volume_cut = self.get_volume(cut)
         # find the complement of the cut
-        volume_complement = self.volume_graph - volume_cut 
+        volume_complement = self.volume_graph - volume_cut
         if min(volume_cut, volume_complement) >= b * self.volume_graph:
             return True
         return False
@@ -270,7 +271,7 @@ class BalSep:
 
     ## FindCut
     def find_cut(self, b: float, alpha: float, embeddings: np.ndarray,
-                 gamma: float) -> np.ndarray | None:
+                 gamma: float) -> (np.ndarray, bool):
         '''
         Input:
             graph: an unweighted instance graph G = (V,E)
@@ -279,7 +280,7 @@ class BalSep:
             embeddings: a list of n-dimensional vectors, where each column vector is an embedding of the node v_i
         Output:
             cut: a subset of V
-            is_balanced: True if the cut is balanced, False otherwise
+            good_cut: True if the cut satisifies all the constraint, False otherwise
         '''
         v_avg = self.compute_average_node_embedding(embeddings)
         r = np.linalg.norm(embeddings - v_avg, axis=1)
@@ -298,27 +299,35 @@ class BalSep:
                 graph_R.remove_node(i)
 
         L_K_R = compute_laplacian_complete_graph(graph_R)
-
+        
         if np.trace(self.laplacian_matrix @ X) > alpha * psi:
-            return None
+            print("trace of L_K_V \bullet X is greater than alpha * psi")
+            good_cut = False
+            # return None
 
         if np.trace(L_K_R @ X) >= alpha * psi / 128:
             cut = projection_rounding(graph_R, embeddings, b)
-            return cut
+            good_cut = True
+            return cut, good_cut
+
+        # TODO:
+        # 2. instead of returning None, even when the FindCut routine estimates no balanced cut exists, return the most balanced cut
 
         # run sweep cut on G with embedding r. Let z be the smallest index such that vol(S_z) >= b/4 * 2m
         # output the most balanced sweep cut among {S1, ..., Sz-1} such that the conductance is at most 40 \sqrt{gamma}
         # if no such cut exists, raise an error
 
         sweep_cut = SweepCut(self.graph, r)
-        _, conductance, cut = sweep_cut.sweep_cut(partial=b / 4 * 2 * self.m)
+        _, conductance, cut = sweep_cut.sweep_cut(partial=b / 4 * 2 * self.m,
+                                                  most_balanced=True,
+                                                  lower_conductance=40 *
+                                                  np.sqrt(gamma))
         if conductance <= 40 * np.sqrt(gamma):
-            return cut
-        else:
-            raise ValueError("No balanced cut exists")
+            good_cut = True
+        return cut
 
     # Final algorithm
-    def balanced_separator(self, b, gamma, epsilon=1, alpha=5) -> set | None:
+    def balanced_separator(self, b, gamma, epsilon=1, alpha=5) -> (set, bool) | None:
         '''
         input:
             graph: an unweighted instance graph G = (V,E)
@@ -366,22 +375,29 @@ class BalSep:
             # compute  L_K_V \bullet D^-1 X_t
             estimate = np.trace(L_K_V @ X_t)
             if estimate <= (1 + epsilon) / self.n:
+                print("estimate is less than (1 + epsilon)/n")
                 return None
 
             # Run FindCut subroutine
-            cut = self.find_cut(b, alpha, vectors.T, gamma)
-            if cut is None:
-                return None 
+            cut, good_cut = self.find_cut(b, alpha, vectors.T, gamma)
+            # depending on how good the cut is, update beta
+            # recurse on the graph by G \ V_S if the cut is not good, keeping the side with higher volume
+            if not good_cut:
+                # print("Cannot find meaningful cut")
+                return cut, False
+
 
             # Check if the cut is balanced
             is_balanced = self.check_balanced(cut, b)
             if is_balanced:
-                return cut  # Return the balanced cut
+                return cut, False  # Return the balanced cut
             else:
                 # S.update(cut)  # Update set S with the new cut
                 S = np.logical_or(S, cut)
+            if self.check_balanced(S, b):
+                return S, True
 
             # Update beta for the next iteration
             beta = update_beta(beta, cut, t, T)
 
-        return None  # If no balanced cut is found, return False
+        return S, False

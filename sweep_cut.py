@@ -84,10 +84,12 @@ class SweepCut:
         return vol_sum
 
     def sweep_cut(self,
-                  lower_vol: float = np.inf,
+                  lower_vol: float = -np.inf,
                   upper_vol: float = np.inf,
                   reversed_cut: bool = True,
-                  partial: float | None = None) -> (float, float, np.ndarray):
+                  partial: float | None = None,
+                  most_balanced: bool = False,
+                  lower_conductance : float = -np.inf) -> (float, float, np.ndarray):
         """Sweep Cut
         
         Also known as threshold cut, takes in a graph and a
@@ -136,11 +138,13 @@ class SweepCut:
         # right now S_i = {j in [n] | x_j <= x_i}
         # the volume of S_i is vol_sum[i] if not reversed
         # otherwise, compute the volume of S_i by vol_sum[-1] - vol_sum[i]
-        vol = vol_sum[-1] - vol_sum if reversed_cut else vol_sum
+        volume_graph = vol_sum[-1]
+        vol = volume_graph - vol_sum if reversed_cut else vol_sum
         # print(vol.shape)
         # print(conductance_arr.shape)
-        conductance_arr[(vol < lower_vol)[:-1] |
-                        (vol > upper_vol)[:-1]] = np.inf
+        if lower_vol != -np.inf or upper_vol != np.inf:
+            conductance_arr[(vol < lower_vol)[:-1] |
+                            (vol > upper_vol)[:-1]] = np.inf
 
         if partial:
             # run sweep cut on G with embedding r. Let z be the smallest index such that vol(S_z) >= b/4 * 2m
@@ -153,6 +157,7 @@ class SweepCut:
             if z == self.n:
                 raise ValueError(f'Partial volume {partial} is too large.')
             conductance_arr = conductance_arr[:z]
+            vol_sum = vol_sum[:z]
 
         if len(self.x.shape) != 1:
             raise ValueError(
@@ -161,7 +166,15 @@ class SweepCut:
 
         cut = np.zeros(self.n, int)
 
-        min_idx = np.argmin(conductance_arr)
+        if most_balanced:
+            # compute the balance of the cut
+            balance = np.minimum(vol_sum, volume_graph - vol_sum)
+            # mask those with conductance larger than gamma
+            balance[conductance_arr > lower_conductance] = np.inf
+            min_idx = np.argmax(balance)
+        else:
+            min_idx = np.argmin(conductance_arr)
+
         thr = self.x[self.sorted_indices[min_idx]]
         conductance = conductance_arr[min_idx]
 
