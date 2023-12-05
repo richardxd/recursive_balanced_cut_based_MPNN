@@ -6,3 +6,7 @@ environment.txt
 test_gpu.py
 .bash_history
 /data
+playground.py
+graph.py
+graph_test.py
+
